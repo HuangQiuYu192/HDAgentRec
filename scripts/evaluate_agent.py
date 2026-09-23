@@ -24,6 +24,7 @@ def main():
     parser.add_argument("--metadata", required=True, help="RecBole .item file")
     parser.add_argument("--cache", default="outputs/phase1_llm.sqlite")
     parser.add_argument("--max-queries", type=int, default=10, help="safe pilot default; use 0 for all queries")
+    parser.add_argument("--only-candidate-hits", action="store_true", help="evaluate reranking only where SASRec already retrieved the target")
     args = parser.parse_args()
     config = Config(model=HDAgentRec, dataset=args.dataset, config_file_list=[args.config]); init_seed(config["seed"], config["reproducibility"])
     dataset = create_dataset(config); train_data, _valid_data, test_data = data_preparation(config, dataset)
@@ -38,6 +39,8 @@ def main():
             for target, history, length, items, uncertainty in zip(positive_i.cpu().tolist(), histories, lengths, top_items.cpu().tolist(), entropy.cpu().tolist()):
                 if args.max_queries and metrics.queries >= args.max_queries:
                     print({**metrics.report(), "cost": agent.cost_metrics}); return
+                if args.only_candidate_hits and int(target) not in items:
+                    continue
                 history = [int(item) for item in history[-int(length):] if item]
                 state = replay_history(agent, history, metadata)
                 candidates = [{"candidate_id": int(item), "metadata": metadata.get(int(item), f"item_id: {item}")} for item in items]
