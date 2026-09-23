@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 
+import torch
+
 from recbole.config import Config
 from recbole.data import create_dataset, data_preparation
 from recbole.utils import get_trainer, init_logger, init_seed
@@ -10,7 +12,22 @@ from recbole.utils import get_trainer, init_logger, init_seed
 from hdagentrec.model import HDAgentRec
 
 
+def enable_recbole_checkpoint_compatibility():
+    """RecBole 1.2.1 checkpoints are trusted local experiment artifacts.
+
+    PyTorch 2.6 changed ``torch.load`` to default to ``weights_only=True``;
+    RecBole's own checkpoint metadata uses pickle protocol 4 and needs the
+    historical behavior for the trainer's final best-checkpoint reload.
+    """
+    original_load = torch.load
+    def load(*args, **kwargs):
+        kwargs.setdefault("weights_only", False)
+        return original_load(*args, **kwargs)
+    torch.load = load
+
+
 def main():
+    enable_recbole_checkpoint_compatibility()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True, help="RecBole .inter dataset name/path stem")
     parser.add_argument("--config", default="configs/recbole_sasrec.yaml")
