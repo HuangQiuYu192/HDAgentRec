@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, TypeVar
@@ -28,10 +29,22 @@ class LLMClient(ABC):
         if key and (cached := self.cache.get(key)) is not None: return schema.model_validate_json(cached)
         started = time.perf_counter(); raw, tokens = self._generate(prompt)
         self.usage.calls += 1; self.usage.tokens += tokens; self.usage.latency_seconds += time.perf_counter() - started
-        raw = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        raw = _first_json_object(raw)
         result = schema.model_validate_json(raw)
         if key: self.cache.set(key, result.model_dump_json())
         return result
+
+
+def _first_json_object(raw: str) -> str:
+    """Accept harmless model labels/code fences while rejecting non-object replies."""
+    start = raw.find("{")
+    if start < 0:
+        raise ValueError("LLM response contains no JSON object")
+    try:
+        _value, end = json.JSONDecoder().raw_decode(raw[start:])
+    except json.JSONDecodeError as error:
+        raise ValueError("LLM response contains invalid JSON") from error
+    return raw[start : start + end]
 
 
 class TransformersLLMClient(LLMClient):

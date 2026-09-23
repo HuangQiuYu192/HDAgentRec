@@ -2,6 +2,7 @@ from pathlib import Path
 from hdagentrec.agent import DynamicUserAgent, LLMClient
 from hdagentrec.phase1 import Phase1Metrics, load_item_metadata, replay_history, rerank_prompt
 from hdagentrec.schemas import UserState
+from hdagentrec.agent import _first_json_object
 
 
 class Stub(LLMClient):
@@ -26,3 +27,7 @@ def test_metadata_loader_and_prompt_are_json_bounded(tmp_path: Path):
     item_file = tmp_path / "items.item"; item_file.write_text("item_id:token\ttitle:token_seq\n7\tExample\n", encoding="utf-8")
     assert "Example" in load_item_metadata(item_file)["7"]
     assert "candidate_id" in rerank_prompt(UserState(), [], [{"candidate_id": 1, "metadata": "x"}], 0.2)
+
+
+def test_json_parser_accepts_a_model_output_label():
+    assert _first_json_object('OUTPUT_JSON:\n{"ranking":[2,1]}') == '{"ranking":[2,1]}'
