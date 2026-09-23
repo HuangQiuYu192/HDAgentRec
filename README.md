@@ -24,6 +24,24 @@ Point `llm.model_name` in `configs/amazon_beauty.yaml` to the pre-downloaded
 Qwen3-14B directory. The local Transformers client loads the model lazily and
 all validated JSON responses are cached in SQLite.
 
+### Dynamic-agent reranking
+
+`scripts/evaluate_agent.py` replays only each test query's chronological
+history, retrieves the SASRec top-20, and permits the frozen LLM to reorder
+only those IDs. It reports candidate coverage separately from ranking metrics,
+plus calls, generated tokens, and mean latency. Start with a cached pilot;
+pass `--max-queries 0` only for a full evaluation.
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python scripts/evaluate_agent.py \
+  --dataset CDs-100-user-dense \
+  --config configs/agentcf_cds_100_user_dense.yaml \
+  --checkpoint saved/HDAgentRec-*.pth \
+  --model /path/to/Qwen3-14B \
+  --metadata dataset/CDs-100-user-dense/CDs.item \
+  --max-queries 10
+```
+
 On the A40 host, the dedicated `hdagentrec` environment and the cached model can
 be checked without any network access:
 
