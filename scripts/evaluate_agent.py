@@ -35,7 +35,7 @@ def main():
     model = HDAgentRec(config, train_data.dataset).to(config["device"]); model.load_state_dict(_checkpoint_state(args.checkpoint)); model.eval()
     raw_metadata = load_item_metadata(args.metadata)
     metadata = {index: raw_metadata.get(str(token), f"item_id: {token}") for index, token in enumerate(dataset.field2id_token[model.ITEM_ID])}
-    agent = DynamicUserAgent(TransformersLLMClient(args.model, cache=SQLiteCache(args.cache))); metrics = Phase1Metrics()
+    agent = DynamicUserAgent(TransformersLLMClient(args.model, cache=SQLiteCache(args.cache))); metrics = Phase1Metrics(candidate_size=10 if args.agentcf_10 else config["agent_candidate_m"])
     pool, rng = None, np.random.RandomState(config["seed"])
     if args.agentcf_10:
         candidate_file = args.candidate_file or str(__import__("pathlib").Path(config["data_path"]) / config["agentcf_candidate_file"])

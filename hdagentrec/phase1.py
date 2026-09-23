@@ -53,6 +53,7 @@ def replay_history(agent: DynamicUserAgent, history: Iterable[int], metadata_by_
 
 @dataclass
 class Phase1Metrics:
+    candidate_size: int = 20
     queries: int = 0
     candidate_hits: int = 0
     backbone: dict[str, float] = field(default_factory=dict)
@@ -67,4 +68,4 @@ class Phase1Metrics:
 
     def report(self) -> dict:
         denominator = max(self.queries, 1)
-        return {"queries": self.queries, "candidate_coverage@20": self.candidate_hits / denominator, "backbone": {key: value / denominator for key, value in self.backbone.items()}, "agent": {key: value / denominator for key, value in self.agent.items()}}
+        return {"queries": self.queries, f"candidate_coverage@{self.candidate_size}": self.candidate_hits / denominator, "backbone": {key: value / denominator for key, value in self.backbone.items()}, "agent": {key: value / denominator for key, value in self.agent.items()}}
