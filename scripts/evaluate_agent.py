@@ -34,7 +34,7 @@ def main():
     with torch.no_grad():
         for interaction, _history, _positive_u, positive_i in test_data:
             interaction = interaction.to(model.device); top_items, _top_scores, entropy = model.candidate_topk(interaction, config["agent_candidate_m"])
-            histories = interaction[model.ITEM_ID + config["LIST_SUFFIX"]].cpu().tolist(); lengths = interaction[model.ITEM_LIST_LENGTH].cpu().tolist()
+            histories = interaction[model.ITEM_ID + config["LIST_SUFFIX"]].cpu().tolist(); lengths = interaction[config["ITEM_LIST_LENGTH_FIELD"]].cpu().tolist()
             for target, history, length, items, uncertainty in zip(positive_i.cpu().tolist(), histories, lengths, top_items.cpu().tolist(), entropy.cpu().tolist()):
                 if args.max_queries and metrics.queries >= args.max_queries:
                     print({**metrics.report(), "cost": agent.cost_metrics}); return
