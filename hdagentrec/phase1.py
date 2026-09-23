@@ -47,7 +47,12 @@ def replay_history(agent: DynamicUserAgent, history: Iterable[int], metadata_by_
     state = UserState()
     for step, item_id in enumerate(history, start=1):
         metadata = metadata_by_id.get(int(item_id), f"item_id: {item_id}")
-        state = agent.update_state(state, int(item_id), step, metadata, state_prompt(state, int(item_id), step, metadata))
+        try:
+            state = agent.update_state(state, int(item_id), step, metadata, state_prompt(state, int(item_id), step, metadata))
+        except (ValueError, TypeError):
+            # A malformed frozen-LLM reply must never create future leakage or
+            # terminate an otherwise reproducible evaluation.
+            agent.invalid_state_updates += 1
     return state
 
 

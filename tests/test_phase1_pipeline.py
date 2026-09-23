@@ -17,6 +17,16 @@ def test_history_replay_uses_only_given_prefix():
     assert [entry.item_id for entry in state.evidence] == [3, 4]
 
 
+class BadStateStub(LLMClient):
+    def _generate(self, prompt): return ("not json", 1)
+
+
+def test_bad_state_reply_keeps_previous_state():
+    agent = DynamicUserAgent(BadStateStub("stub"))
+    assert replay_history(agent, [3], {}).evidence == []
+    assert agent.cost_metrics["invalid_state_updates"] == 1
+
+
 def test_metrics_report_candidate_coverage_and_rerank_gain():
     result = Phase1Metrics(); result.add([1, 2], [2, 1], 2)
     report = result.report(); assert report["candidate_coverage@20"] == 1.0

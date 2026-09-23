@@ -76,7 +76,7 @@ class TransformersLLMClient(LLMClient):
 
 
 class DynamicUserAgent:
-    def __init__(self, client: LLMClient): self.client, self.invalid_reranks = client, 0
+    def __init__(self, client: LLMClient): self.client, self.invalid_reranks, self.invalid_state_updates = client, 0, 0
     def update_state(self, state: UserState, item_id: int, step: int, metadata: str, prompt: str) -> UserState:
         return apply_memory_update(state, self.client.generate_json(prompt, MemoryUpdate, "dynamic_state_v1"), item_id, step, metadata)
     def rerank(self, candidate_ids: list[int], prompt: str) -> list[int]:
@@ -88,4 +88,4 @@ class DynamicUserAgent:
     @property
     def cost_metrics(self):
         u = self.client.usage
-        return {"llm_calls": u.calls, "tokens": u.tokens, "avg_latency": u.latency_seconds / max(u.calls, 1), "invalid_reranks": self.invalid_reranks}
+        return {"llm_calls": u.calls, "tokens": u.tokens, "avg_latency": u.latency_seconds / max(u.calls, 1), "invalid_reranks": self.invalid_reranks, "invalid_state_updates": self.invalid_state_updates}

@@ -83,7 +83,11 @@ def main():
                 candidates = [{"candidate_id": int(item), "metadata": metadata.get(int(item), f"item_id: {item}")} for item in items]
                 recent_k = config["recent_k"]
                 recent = [{"item_id": item, "metadata": metadata.get(item, f"item_id: {item}")} for item in history[-recent_k:]]
-                reranked = agent.rerank([int(item) for item in items], rerank_prompt(state, recent, candidates, float(uncertainty)))
+                try:
+                    reranked = agent.rerank([int(item) for item in items], rerank_prompt(state, recent, candidates, float(uncertainty)))
+                except (ValueError, TypeError):
+                    agent.invalid_reranks += 1
+                    reranked = [int(item) for item in backbone_ranking]
                 metrics.add([int(item) for item in backbone_ranking], reranked, int(target))
                 traces.append({"query_index": metrics.queries, "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_rank": reranked.index(int(target)) + 1, "agent_invoked": True, "candidate_entropy": float(uncertainty), "top1_top2_margin": float(margin), "candidate_ids": [int(item) for item in items]})
     if args.trace_output:
