@@ -22,13 +22,15 @@ from sklearn.preprocessing import StandardScaler
 from hdagentrec.router import FEATURE_NAMES, agent_improved, features_from_trace
 
 
-def load_rows(paths: list[str]) -> list[dict]:
+def load_rows(paths: list[str], assume_agent_invoked: bool) -> list[dict]:
     rows = []
     for path in paths:
         for line in Path(path).read_text(encoding="utf-8").splitlines():
             if line.strip():
                 row = json.loads(line)
-                if row.get("agent_invoked"):
+                # Legacy full-agent traces predate the explicit field.  They
+                # are accepted only through an intentional CLI declaration.
+                if row.get("agent_invoked", assume_agent_invoked):
                     rows.append(row)
     if not rows:
         raise ValueError("no agent-invoked trace rows found")
@@ -54,8 +56,9 @@ def main():
     parser.add_argument("--report", required=True)
     parser.add_argument("--seed", type=int, default=2024)
     parser.add_argument("--test-size", type=float, default=0.25)
+    parser.add_argument("--assume-agent-invoked", action="store_true", help="treat legacy rows without agent_invoked as full-agent labels")
     args = parser.parse_args()
-    rows = load_rows(args.traces)
+    rows = load_rows(args.traces, args.assume_agent_invoked)
     x = np.asarray([features_from_trace(row) for row in rows], dtype=np.float64)
     y = np.asarray([agent_improved(row) for row in rows], dtype=np.int64)
     if len(np.unique(y)) != 2:
