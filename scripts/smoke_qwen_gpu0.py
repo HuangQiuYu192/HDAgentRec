@@ -16,7 +16,7 @@ if torch.cuda.device_count() != 1:
 tokenizer = AutoTokenizer.from_pretrained(args.model, local_files_only=True)
 model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype="auto", device_map="cuda:0", local_files_only=True)
 messages = [{"role": "user", "content": "Reply with exactly: HDAgentRec ready."}]
-prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
 inputs = tokenizer([prompt], return_tensors="pt").to(model.device)
 with torch.inference_mode():
     output = model.generate(**inputs, max_new_tokens=24, do_sample=False)
