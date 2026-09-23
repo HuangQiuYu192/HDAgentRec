@@ -37,6 +37,8 @@ class LLMClient(ABC):
             payload = json.loads(raw)
             if isinstance(payload.get("ranking"), list):
                 payload["ranking"] = list(dict.fromkeys(payload["ranking"]))
+            if isinstance(payload.get("reasoning_summary"), dict):
+                payload["reasoning_summary"] = {str(key): "" if value is None else str(value) for key, value in payload["reasoning_summary"].items()}
             raw = json.dumps(payload)
         result = schema.model_validate_json(raw)
         if key: self.cache.set(key, result.model_dump_json())

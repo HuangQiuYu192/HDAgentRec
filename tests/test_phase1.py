@@ -31,3 +31,11 @@ class DuplicateStub(LLMClient):
 
 def test_duplicate_llm_ranking_is_deduplicated_before_validation():
     assert DynamicUserAgent(DuplicateStub("stub")).rerank([1, 2, 3], "x") == [2, 1, 3]
+
+
+class NullSummaryStub(LLMClient):
+    def _generate(self, prompt): return ('{"ranking": [2, 1], "reasoning_summary": {"current_intent": null}}', 3)
+
+
+def test_null_reasoning_summary_is_normalized():
+    assert DynamicUserAgent(NullSummaryStub("stub")).rerank([1, 2], "x") == [2, 1]
