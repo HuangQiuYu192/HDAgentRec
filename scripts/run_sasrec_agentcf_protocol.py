@@ -47,7 +47,7 @@ def main():
     init_seed(config["seed"], config["reproducibility"])
     dataset = create_dataset(config); train_data, valid_data, test_data = data_preparation(config, dataset)
     model = HDAgentRec(config, train_data.dataset).to(config["device"])
-    path = Path(config["data_path"]) / args.dataset / config["agentcf_candidate_file"]
+    path = Path(config["data_path"]) / config["agentcf_candidate_file"]
     pool = AgentCFCandidatePool.from_file(path, dataset.field2token_id[model.USER_ID], dataset.field2token_id[model.ITEM_ID])
     optimizer = torch.optim.Adam(model.parameters(), lr=config["learning_rate"])
     best, best_epoch, stale, best_state = -1.0, -1, 0, None
