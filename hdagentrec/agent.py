@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import json
+import torch
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, TypeVar
@@ -49,13 +50,20 @@ def _first_json_object(raw: str) -> str:
 
 class TransformersLLMClient(LLMClient):
     def __init__(self, model_name: str, cache: Optional[SQLiteCache] = None, device_map="auto"):
-        super().__init__(model_name, cache); self.device_map, self._pipeline = device_map, None
+        super().__init__(model_name, cache); self.device_map, self._model, self._tokenizer = device_map, None, None
     def _generate(self, prompt: str) -> tuple[str, int]:
-        if self._pipeline is None:
-            from transformers import pipeline
-            self._pipeline = pipeline("text-generation", model=self.model_name, device_map=self.device_map, torch_dtype="auto")
-        output = self._pipeline(prompt, max_new_tokens=512, do_sample=False, return_full_text=False)[0]["generated_text"]
-        return output, len(output.split())
+        if self._model is None:
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name, local_files_only=True)
+            self._model = AutoModelForCausalLM.from_pretrained(self.model_name, torch_dtype="auto", device_map=self.device_map, local_files_only=True)
+        messages = [{"role": "user", "content": prompt}]
+        rendered = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        inputs = self._tokenizer([rendered], return_tensors="pt").to(self._model.device)
+        with torch.inference_mode():
+            output = self._model.generate(**inputs, max_new_tokens=256, do_sample=False)
+        generated = output[:, inputs.input_ids.shape[1]:]
+        text = self._tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+        return text, int(generated.shape[1])
 
 
 class DynamicUserAgent:
