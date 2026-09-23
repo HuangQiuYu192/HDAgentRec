@@ -41,7 +41,8 @@ def main():
                 history = [int(item) for item in history[-int(length):] if item]
                 state = replay_history(agent, history, metadata)
                 candidates = [{"candidate_id": int(item), "metadata": metadata.get(int(item), f"item_id: {item}")} for item in items]
-                recent = [{"item_id": item, "metadata": metadata.get(item, f"item_id: {item}")} for item in history[-config.get("recent_k", 10):]]
+                recent_k = config["recent_k"]
+                recent = [{"item_id": item, "metadata": metadata.get(item, f"item_id: {item}")} for item in history[-recent_k:]]
                 reranked = agent.rerank([int(item) for item in items], rerank_prompt(state, recent, candidates, float(uncertainty)))
                 metrics.add([int(item) for item in items], reranked, int(target))
     print({**metrics.report(), "cost": agent.cost_metrics})
