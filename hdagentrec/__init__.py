@@ -2,5 +2,6 @@
 
 from .schemas import UserState
 from .recbole_model import HDAgentSASRec
+from .model import HDAgentRec
 
-__all__ = ["UserState", "HDAgentSASRec"]
+__all__ = ["UserState", "HDAgentSASRec", "HDAgentRec"]

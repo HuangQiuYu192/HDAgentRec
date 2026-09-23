@@ -4,13 +4,13 @@ Hindsight-Guided Dynamic User Agents for Sequential Recommendation.
 
 ## Phase 1
 
-This first research prototype is **RecBole-native**, like the reproducible
-backbone layer in AgentCF-style systems. It subclasses RecBole's maintained
-`SASRec`, so data handling, strict leave-two-out temporal evaluation, trainer,
-full-sort ranking and metrics stay within RecBole. HDAgentRec contributes the
-structured dynamic user state, provider-independent LLM client, SQLite response
-cache, and a top-20 candidate reranking boundary. Oracle/hindsight training is
-deliberately deferred to Phase 2.
+This first research prototype follows **AgentCF's RecBole-native structure**:
+`HDAgentRec` is a `SequentialRecommender` that owns a per-user agent registry;
+the model delegates differentiable next-item training to RecBole SASRec, and an
+agent-evaluation bridge invokes a frozen local LLM only after top-M retrieval.
+This preserves RecBole's data, temporal evaluation and metric lifecycle while
+replacing AgentCF's free-text mutable user memory with a typed, deterministic
+dynamic state. Oracle/hindsight training is deliberately deferred to Phase 2.
 
 ```bash
 pip install -r requirements.txt

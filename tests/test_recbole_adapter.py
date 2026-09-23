@@ -2,9 +2,9 @@ import pytest
 
 
 def test_recbole_adapter_is_importable_without_recbole():
-    from hdagentrec.recbole_model import HDAgentSASRec
+    from hdagentrec.model import HDAgentRec
     # The fallback remains importable in a light unit-test environment.
-    assert HDAgentSASRec is not None
+    assert HDAgentRec is not None
 
 
 @pytest.mark.skipif(__import__("importlib").util.find_spec("recbole") is None, reason="RecBole installed in experiment environment")
