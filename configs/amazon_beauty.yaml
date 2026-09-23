@@ -1,0 +1,13 @@
+seed: 42
+dataset: Beauty
+max_history: 50
+hidden_dim: 128
+heads: 4
+layers: 2
+dropout: 0.2
+candidate_m: 20
+recent_k: 10
+llm:
+  model_name: /path/to/Qwen3-14B
+  temperature: 0
+  cache_path: data/oracle_cache/phase1_llm.sqlite
