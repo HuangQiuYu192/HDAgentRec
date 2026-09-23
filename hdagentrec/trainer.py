@@ -35,9 +35,13 @@ class AgentCFCandidatePool:
                     pools[user_token_to_id[user]] = [item_token_to_id[item] for item in items.split() if item in item_token_to_id]
         return cls(pools)
 
+    def negatives_for(self, user_id: int, positive_id: int) -> list[int]:
+        """Return the complete pre-generated negative pool for one query."""
+        return [item for item in self.pools[int(user_id)] if item != int(positive_id)]
+
     def with_positive(self, user_id: int, positive_id: int, budget: int = 20) -> list[int]:
         if budget < 2: raise ValueError("AgentCF candidate budget must include a positive and a negative")
-        negatives = [item for item in self.pools[int(user_id)] if item != int(positive_id)]
+        negatives = self.negatives_for(user_id, positive_id)
         return negatives[: budget - 1] + [int(positive_id)]
 
 
