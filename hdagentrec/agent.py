@@ -31,6 +31,13 @@ class LLMClient(ABC):
         started = time.perf_counter(); raw, tokens = self._generate(prompt)
         self.usage.calls += 1; self.usage.tokens += tokens; self.usage.latency_seconds += time.perf_counter() - started
         raw = _first_json_object(raw)
+        if schema is RerankResponse:
+            # Qwen can repeat a supplied ID despite the prompt. Keep the first
+            # occurrence deterministically, then let Pydantic validate types.
+            payload = json.loads(raw)
+            if isinstance(payload.get("ranking"), list):
+                payload["ranking"] = list(dict.fromkeys(payload["ranking"]))
+            raw = json.dumps(payload)
         result = schema.model_validate_json(raw)
         if key: self.cache.set(key, result.model_dump_json())
         return result
@@ -72,7 +79,7 @@ class DynamicUserAgent:
         return apply_memory_update(state, self.client.generate_json(prompt, MemoryUpdate, "dynamic_state_v1"), item_id, step, metadata)
     def rerank(self, candidate_ids: list[int], prompt: str) -> list[int]:
         ranking = self.client.generate_json(prompt, RerankResponse, "reranker_v1").ranking
-        valid = [item for item in ranking if item in candidate_ids]
+        valid = list(dict.fromkeys(item for item in ranking if item in candidate_ids))
         if len(valid) != len(ranking):
             self.invalid_reranks += 1
         return valid + [candidate for candidate in candidate_ids if candidate not in valid]

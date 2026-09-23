@@ -23,3 +23,11 @@ def test_candidate_rankings_are_validated():
     agent = DynamicUserAgent(Stub("stub"))
     assert agent.rerank([1, 3], "x") == [1, 3]
     assert agent.cost_metrics["invalid_reranks"] == 1
+
+
+class DuplicateStub(LLMClient):
+    def _generate(self, prompt): return ('{"ranking": [2, 2, 1]}', 3)
+
+
+def test_duplicate_llm_ranking_is_deduplicated_before_validation():
+    assert DynamicUserAgent(DuplicateStub("stub")).rerank([1, 2, 3], "x") == [2, 1, 3]
