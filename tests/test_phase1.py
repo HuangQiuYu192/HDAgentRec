@@ -20,4 +20,6 @@ class Stub(LLMClient):
 
 def test_candidate_rankings_are_validated():
     assert DynamicUserAgent(Stub("stub")).rerank([1, 2, 3], "x") == [2, 1, 3]
-    with pytest.raises(ValueError): DynamicUserAgent(Stub("stub")).rerank([1, 3], "x")
+    agent = DynamicUserAgent(Stub("stub"))
+    assert agent.rerank([1, 3], "x") == [1, 3]
+    assert agent.cost_metrics["invalid_reranks"] == 1

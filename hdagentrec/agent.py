@@ -67,14 +67,16 @@ class TransformersLLMClient(LLMClient):
 
 
 class DynamicUserAgent:
-    def __init__(self, client: LLMClient): self.client = client
+    def __init__(self, client: LLMClient): self.client, self.invalid_reranks = client, 0
     def update_state(self, state: UserState, item_id: int, step: int, metadata: str, prompt: str) -> UserState:
         return apply_memory_update(state, self.client.generate_json(prompt, MemoryUpdate, "dynamic_state_v1"), item_id, step, metadata)
     def rerank(self, candidate_ids: list[int], prompt: str) -> list[int]:
         ranking = self.client.generate_json(prompt, RerankResponse, "reranker_v1").ranking
-        if not set(ranking).issubset(candidate_ids): raise ValueError("LLM returned a candidate outside the supplied top-M set")
-        return ranking + [candidate for candidate in candidate_ids if candidate not in ranking]
+        valid = [item for item in ranking if item in candidate_ids]
+        if len(valid) != len(ranking):
+            self.invalid_reranks += 1
+        return valid + [candidate for candidate in candidate_ids if candidate not in valid]
     @property
     def cost_metrics(self):
         u = self.client.usage
-        return {"llm_calls": u.calls, "tokens": u.tokens, "avg_latency": u.latency_seconds / max(u.calls, 1)}
+        return {"llm_calls": u.calls, "tokens": u.tokens, "avg_latency": u.latency_seconds / max(u.calls, 1), "invalid_reranks": self.invalid_reranks}
