@@ -32,3 +32,21 @@ source /home/hqy/miniconda3/etc/profile.d/conda.sh
 CUDA_VISIBLE_DEVICES=0 conda run -n hdagentrec python scripts/smoke_qwen_gpu0.py \
   --model /home/hqy/.cache/huggingface/hub/models--Qwen--Qwen3-14B/snapshots/40c069824f4251a91eefaf281ebe4c544efd3e18
 ```
+
+## AgentCF comparison dataset
+
+For the initial apples-to-apples comparison, use the included public AgentCF
+benchmark `dataset/CDs-100-user-dense/`. Its original pre-split sequence files,
+CD metadata, and `CDs-100-user-dense.random` candidate file are preserved
+unchanged. The config below mirrors AgentCF's temporal leave-valid-and-test
+protocol and 20-item candidate budget:
+
+```bash
+python scripts/run_recbole.py --dataset CDs-100-user-dense \
+  --config configs/agentcf_cds_100_user_dense.yaml
+```
+
+This evaluates the SASRec candidate generator with standard full-sort RecBole
+metrics. `AgentCFCandidatePool` consumes the provided `.random` file and forms
+the same 19 sampled negatives plus held-out positive protocol as AgentCF. It
+never uses test labels to retrieve additional candidates.
