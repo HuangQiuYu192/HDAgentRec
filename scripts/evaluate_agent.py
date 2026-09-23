@@ -51,9 +51,10 @@ def main():
             if pool is None:
                 top_items, _top_scores, entropy = model.candidate_topk(interaction, config["agent_candidate_m"])
                 candidate_lists, backbone_lists, uncertainties = top_items.cpu().tolist(), top_items.cpu().tolist(), entropy.cpu().tolist()
+                margins = (_top_scores[:, 0] - _top_scores[:, 1]).cpu().tolist()
             else:
                 all_scores = model.full_sort_predict(interaction).view(len(interaction), model.n_items)
-                candidate_lists, backbone_lists, uncertainties = [], [], []
+                candidate_lists, backbone_lists, uncertainties, margins = [], [], [], []
                 for row_scores, user_id, target in zip(all_scores, interaction[model.USER_ID].cpu().tolist(), targets):
                     candidates = pool.with_positive(user_id, int(target), budget=10); rng.shuffle(candidates)
                     tensor = torch.tensor(candidates, device=model.device)
@@ -62,7 +63,8 @@ def main():
                     probabilities = torch.softmax(scores, dim=0)
                     candidate_lists.append(candidates); backbone_lists.append(ranked)
                     uncertainties.append(float(-(probabilities * probabilities.clamp_min(1e-12).log()).sum().item()))
-            for target, history, length, items, backbone_ranking, uncertainty in zip(targets, histories, lengths, candidate_lists, backbone_lists, uncertainties):
+                    margins.append(float(torch.topk(scores, k=2).values.diff().abs().item()))
+            for target, history, length, items, backbone_ranking, uncertainty, margin in zip(targets, histories, lengths, candidate_lists, backbone_lists, uncertainties, margins):
                 if args.max_queries and metrics.queries >= args.max_queries:
                     continue
                 if args.only_candidate_hits and int(target) not in backbone_ranking:
@@ -74,7 +76,7 @@ def main():
                 recent = [{"item_id": item, "metadata": metadata.get(item, f"item_id: {item}")} for item in history[-recent_k:]]
                 reranked = agent.rerank([int(item) for item in items], rerank_prompt(state, recent, candidates, float(uncertainty)))
                 metrics.add([int(item) for item in backbone_ranking], reranked, int(target))
-                traces.append({"query_index": metrics.queries, "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_rank": reranked.index(int(target)) + 1, "candidate_ids": [int(item) for item in items]})
+                traces.append({"query_index": metrics.queries, "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_rank": reranked.index(int(target)) + 1, "candidate_entropy": float(uncertainty), "top1_top2_margin": float(margin), "candidate_ids": [int(item) for item in items]})
     if args.trace_output:
         Path(args.trace_output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.trace_output).write_text("".join(json.dumps(row) + "\n" for row in traces), encoding="utf-8")
