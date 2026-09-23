@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import json
+import pickle
 import numpy as np
 import torch
 from pathlib import Path
@@ -12,6 +13,7 @@ from hdagentrec.agent import DynamicUserAgent, TransformersLLMClient
 from hdagentrec.cache import SQLiteCache
 from hdagentrec.model import HDAgentRec
 from hdagentrec.phase1 import Phase1Metrics, load_item_metadata, replay_history, rerank_prompt
+from hdagentrec.router import invocation_probability
 from hdagentrec.trainer import AgentCFCandidatePool
 
 
@@ -34,7 +36,15 @@ def main():
     parser.add_argument("--trace-output", help="optional JSONL per-query rank trace")
     parser.add_argument("--query-offset", type=int, default=0, help="skip this many eligible test queries before evaluation")
     parser.add_argument("--entropy-threshold", type=float, help="invoke the agent only when candidate entropy meets this threshold")
+    parser.add_argument("--router-model", help="pickle produced by train_router.py; invokes when its P(gain) meets --router-threshold")
+    parser.add_argument("--router-threshold", type=float, default=0.5)
     args = parser.parse_args()
+    if args.router_model and args.entropy_threshold is not None:
+        parser.error("--router-model and --entropy-threshold are mutually exclusive")
+    router = None
+    if args.router_model:
+        with open(args.router_model, "rb") as handle:
+            router = pickle.load(handle)
     config = Config(model=HDAgentRec, dataset=args.dataset, config_file_list=[args.config]); init_seed(config["seed"], config["reproducibility"])
     dataset = create_dataset(config); train_data, _valid_data, test_data = data_preparation(config, dataset)
     model = HDAgentRec(config, train_data.dataset).to(config["device"]); model.load_state_dict(_checkpoint_state(args.checkpoint)); model.eval()
@@ -66,7 +76,8 @@ def main():
                     candidate_lists.append(candidates); backbone_lists.append(ranked)
                     uncertainties.append(float(-(probabilities * probabilities.clamp_min(1e-12).log()).sum().item()))
                     margins.append(float(torch.topk(scores, k=2).values.diff().abs().item()))
-            for target, history, length, items, backbone_ranking, uncertainty, margin in zip(targets, histories, lengths, candidate_lists, backbone_lists, uncertainties, margins):
+            user_ids = interaction[model.USER_ID].cpu().tolist()
+            for user_id, target, history, length, items, backbone_ranking, uncertainty, margin in zip(user_ids, targets, histories, lengths, candidate_lists, backbone_lists, uncertainties, margins):
                 eligible_queries += 1
                 if eligible_queries <= args.query_offset:
                     continue
@@ -74,9 +85,13 @@ def main():
                     continue
                 if args.only_candidate_hits and int(target) not in backbone_ranking:
                     continue
-                if args.entropy_threshold is not None and float(uncertainty) < args.entropy_threshold:
+                invoke_agent = args.entropy_threshold is None or float(uncertainty) >= args.entropy_threshold
+                if router is not None:
+                    invoke_agent = invocation_probability(router, float(uncertainty), float(margin)) >= args.router_threshold
+                trace_base = {"query_index": metrics.queries, "user_id": int(user_id), "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "candidate_entropy": float(uncertainty), "top1_top2_margin": float(margin), "candidate_ids": [int(item) for item in items]}
+                if not invoke_agent:
                     metrics.add([int(item) for item in backbone_ranking], [int(item) for item in backbone_ranking], int(target))
-                    traces.append({"query_index": metrics.queries, "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_invoked": False, "candidate_entropy": float(uncertainty), "top1_top2_margin": float(margin), "candidate_ids": [int(item) for item in items]})
+                    traces.append({**trace_base, "agent_rank": trace_base["backbone_rank"], "agent_invoked": False})
                     continue
                 history = [int(item) for item in history[-int(length):] if item]
                 state = replay_history(agent, history, metadata)
@@ -89,7 +104,7 @@ def main():
                     agent.invalid_reranks += 1
                     reranked = [int(item) for item in backbone_ranking]
                 metrics.add([int(item) for item in backbone_ranking], reranked, int(target))
-                traces.append({"query_index": metrics.queries, "target": int(target), "backbone_rank": [int(item) for item in backbone_ranking].index(int(target)) + 1, "agent_rank": reranked.index(int(target)) + 1, "agent_invoked": True, "candidate_entropy": float(uncertainty), "top1_top2_margin": float(margin), "candidate_ids": [int(item) for item in items]})
+                traces.append({**trace_base, "agent_rank": reranked.index(int(target)) + 1, "agent_invoked": True})
     if args.trace_output:
         Path(args.trace_output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.trace_output).write_text("".join(json.dumps(row) + "\n" for row in traces), encoding="utf-8")
