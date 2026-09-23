@@ -23,3 +23,12 @@ The RecBole `.inter` file must have `user_id`, `item_id`, and `timestamp` fields
 Point `llm.model_name` in `configs/amazon_beauty.yaml` to the pre-downloaded
 Qwen3-14B directory. The local Transformers client loads the model lazily and
 all validated JSON responses are cached in SQLite.
+
+On the A40 host, the dedicated `hdagentrec` environment and the cached model can
+be checked without any network access:
+
+```bash
+source /home/hqy/miniconda3/etc/profile.d/conda.sh
+CUDA_VISIBLE_DEVICES=0 conda run -n hdagentrec python scripts/smoke_qwen_gpu0.py \
+  --model /home/hqy/.cache/huggingface/hub/models--Qwen--Qwen3-14B/snapshots/40c069824f4251a91eefaf281ebe4c544efd3e18
+```
